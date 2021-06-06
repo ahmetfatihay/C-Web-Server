@@ -20,7 +20,7 @@
 typedef struct sockaddr_in SA_IN;
 typedef struct sockaddr SA;
 
-void handle_connection(int client_socket);
+void* handle_connection(void* p_client_socket);
 
 int main(int argc, char **argv)
 {
@@ -44,13 +44,13 @@ int main(int argc, char **argv)
         exit(0);
     }
 
-    if((listen(listenfd, 10)) < 0)
+    if((listen(listenfd, 100)) < 0)
     {
         printf("Listen error");
         exit(0);
     }
 
-    for(;;)
+    while(1)
     {
         struct sockaddr_in addr;
         socklen_t addr_len;
@@ -59,17 +59,26 @@ int main(int argc, char **argv)
         printf("Waiting for a connection on port %d\n", PORT);
         fflush(stdout);
 
-        connfd = accept(listenfd, (SA *) &addr, &addr_len);
+        if((connfd = accept(listenfd, (SA *) &addr, &addr_len)) < 0)
+        {
+            printf("Bind error");
+            exit(0);
+        }
 
         inet_ntop(AF_INET, &addr, client_address, MAXLINE);
         printf("Client connection: %s\n", client_address);
 
-        handle_connection(connfd);
+        pthread_t t;
+        int *pclient = malloc(sizeof(int));
+        *pclient = connfd;
+        pthread_create(&t, NULL, handle_connection, pclient);
     }
 }
 
-void handle_connection(int client_socket)
+void* handle_connection(void* p_client_socket)
 {
+    int client_socket = *(int*)p_client_socket;
+    free(p_client_socket);
     int n;
     uint8_t recvline[MAXLINE+1];
     uint8_t buff[MAXLINE+1];
@@ -80,7 +89,7 @@ void handle_connection(int client_socket)
     {
         printf("\nReceived:\n%s\n", recvline);
         
-        if(recvline[n-1] == '\n')
+        if(n<4 || (recvline[n-1] == '\n' && recvline[n-2] == '\r' && recvline[n-3] == '\n' && recvline[n-4] == '\r'))
         {
             break;
         }
@@ -100,7 +109,5 @@ void handle_connection(int client_socket)
     
     close(client_socket);
 
+    return NULL;
 }
-
-/*
-*/

@@ -15,15 +15,17 @@
 #include <arpa/inet.h>
 
 #define PORT 18000
-#define SA struct sockaddr
 #define MAXLINE 4096
+
+typedef struct sockaddr_in SA_IN;
+typedef struct sockaddr SA;
+
+void handle_connection(int client_socket);
 
 int main(int argc, char **argv)
 {
-    int listenfd, connfd, n;
+    int listenfd, connfd;
     struct sockaddr_in servaddr;
-    uint8_t buff[MAXLINE+1];
-    uint8_t recvline[MAXLINE+1];
 
     if((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
@@ -62,30 +64,43 @@ int main(int argc, char **argv)
         inet_ntop(AF_INET, &addr, client_address, MAXLINE);
         printf("Client connection: %s\n", client_address);
 
-        memset(recvline, 0, MAXLINE);
-
-        while((n = read(connfd, recvline, MAXLINE-1)) > 0)
-        {
-            printf("\nReceived:\n%s\n", recvline);
-            
-            if(recvline[n-1] == '\n')
-            {
-                break;
-            }
-
-            memset(recvline, 0, MAXLINE);
-        }
-
-        if(n < 0)
-        {
-            printf("Read error");
-            exit(0);
-        }
-
-        snprintf((char*)buff, sizeof(buff), "HTTP/1.0 200 OK\r\n\r\nHello");
-
-        write(connfd, (char*)buff, strlen((char*)buff));
-        
-        close(connfd);
+        handle_connection(connfd);
     }
 }
+
+void handle_connection(int client_socket)
+{
+    int n;
+    uint8_t recvline[MAXLINE+1];
+    uint8_t buff[MAXLINE+1];
+
+    memset(recvline, 0, MAXLINE);
+
+    while((n = recv(client_socket, recvline, MAXLINE-1, 0)) > 0)
+    {
+        printf("\nReceived:\n%s\n", recvline);
+        
+        if(recvline[n-1] == '\n')
+        {
+            break;
+        }
+
+        memset(recvline, 0, MAXLINE);
+    }
+
+    if(n < 0)
+    {
+        printf("Read error");
+        exit(0);
+    }
+
+    snprintf((char*)buff, sizeof(buff), "HTTP/1.0 200 OK\r\n\r\nHello");
+
+    write(client_socket, (char*)buff, strlen((char*)buff));
+    
+    close(client_socket);
+
+}
+
+/*
+*/
